@@ -1,6 +1,4 @@
 #pragma once
-#ifndef VEC3_H
-#define VEC3_H
 #include <math.h>
 #include <stdlib.h>
 #include <iostream>
@@ -8,7 +6,7 @@
 class Vec3
 {
 public:
-	Vec3() {}
+	Vec3() : e() {}
 	Vec3(float e0, float e1, float e2) { e[0] = e0; e[1] = e1; e[2] = e2; }
 	inline float x() const { return e[0]; }
 	inline float y() const { return e[1]; }
@@ -44,9 +42,13 @@ public:
 	inline Vec3 operator*(const float& t) const {
 		return Vec3(x() * t, y() * t, z() * t);
 	}
+	inline Vec3 operator*(const Vec3& v) const {
+		return Vec3(x() * v.x(), y() * v.y(), z() * v.z());
+	}
 	inline friend Vec3 operator*(float t, Vec3 v) {
 		return v * t;
 	}
+	
 
 	inline Vec3 operator/(const float& t) const {
 		return Vec3(x() / t, y() / t, z() / t);
@@ -59,7 +61,6 @@ public:
 	inline Vec3 operator-(const Vec3& v) const {
 		return Vec3(x() - v.x(), y() - v.y(), z() - v.z());
 	}
-	//inline Vec3 operator*(float t);
 
 	inline static float Dot(const Vec3& v1, const Vec3& v2) {
 		return v1.x() * v2.x() + v1.y() * v2.y() + v1.z() * v2.z();
@@ -70,6 +71,9 @@ public:
 			-(v1.x() * v2.z() - v1.z() * v2.x()),
 			v1.x() * v2.y() - v1.y() * v2.x());
 	}
+
+
+
 
 	inline float SqrMagnitude() const {
 		return x() * x() + y() * y() + z() * z();
@@ -87,8 +91,7 @@ public:
 		*this *= k;
 	}
 
+
+
 	float e[3];
 };
-
-
-#endif // !VEC_H

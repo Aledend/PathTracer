@@ -4,7 +4,7 @@
 class HittableList : public Hittable
 {
 public:
-	HittableList() {}
+	HittableList() : list(0), listSize(0) {}
 	HittableList(Hittable** l, int n) {list = l; listSize = n;}
 
 	virtual bool Hit(const Ray& r, float tMin, float tMax, HitRecord& rec) const;

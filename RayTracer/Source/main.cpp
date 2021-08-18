@@ -5,17 +5,20 @@
 #include <GLFW/glfw3.h>
 #include <GL/GL.h>
 #include <limits>
+#include "Math/MathUtility.h"
 #include "Math/Vec3.h"
 #include "Math/Ray.h"
 #include "Physics/Collision.h"
-#include "Geometry/Sphere.h"
 #include "Geometry/Hittable.h"
+#include "Geometry/Sphere.h"
 #include "Framework/HittableList.h"
-#include "Camera.h"
+#include "Rendering/Camera.h"
 
 
-const int WINDOW_WIDTH = 800;
-const int WINDOW_HEIGHT = 600;
+
+
+const int WINDOW_WIDTH = 1200;
+const int WINDOW_HEIGHT = 800;
 const int PIXEL_COUNT = WINDOW_HEIGHT * WINDOW_WIDTH;
 const int WORK_GROUP_SIZE = 100;
 
@@ -30,7 +33,7 @@ struct spherestruct {
 	float radius;
 };
 
-
+#pragma region Compute Shader SRC
 const char* CALC_SRC = R"(#version 430 compatibility
 //#extension GL_ARB_compute_shader: enable
 //#extension GL_ARB_shader_storage_buffer_object: enable
@@ -183,20 +186,9 @@ void main()
 	color_output[id] = vec4(color, 1);
 })";
 
+#pragma endregion 
 
-Vec3 color(const Ray& r, HittableList* world) {
-	HitRecord rec;
-	if (world->Hit(r, 0.0f, std::numeric_limits<float>::max(), rec))
-	{
-		return 0.5f * Vec3(rec.normal.x() + 1.f, rec.normal.y() + 1.f, rec.normal.z() + 1.f);
-	}
-	else
-	{
-		Vec3 unitDirection = r.Direction().Normalized();
-		float t = 0.5f * (unitDirection.y() + 1.0f);
-		return (1.0f - t) * Vec3(1.0f, 1.0f, 1.0f) + t * Vec3(0.5f, 0.7f, 1.0f);
-	}
-}
+
 
 
 void handle_key_event(GLFWwindow* window, int key, int scancode, int action, int modifiers)
@@ -221,6 +213,64 @@ void handle_mouse_event(GLFWwindow* window, int button, int action, int modifier
 		glfwGetCursorPos(window, &mouse_x, &mouse_y);
 		printf("bom (%f, %f)\n", mouse_x, mouse_y);
 	}
+}
+
+
+
+Vec3 Color(const Ray& r, HittableList* world, int depth) {
+	HitRecord rec;
+	constexpr float floatMax = std::numeric_limits<float>::max();
+
+	if (world->Hit(r, 0.001f, floatMax, rec))
+	{
+		Ray scattered;
+		Vec3 attenuation;
+		if (depth < 50 && rec.mat_ptr->Scatter(r, rec, attenuation, scattered)) {
+			return attenuation * Color(scattered, world, depth + 1);
+		}
+		else {
+			return Vec3(0,0,0);
+		}
+	}
+	else
+	{
+		Vec3 unitDirection = r.Direction().Normalized();
+		float t = 0.5f * (unitDirection.y() + 1.0f);
+		return (1.0f - t) * Vec3(1.0f, 1.0f, 1.0f) + t * Vec3(0.5f, 0.7f, 1.0f);
+	}
+}
+
+Hittable* RandomScene() {
+	const int n = 20;
+	Hittable** list = new Hittable*[n+1];
+	list[0] = new Sphere(Vec3(0, -1000, 0), 1000, new Lambertian(Vec3(0.5f, 0.5f, 0.5f)));
+	int i = 1;
+
+	for (int a = -2; a < 2; a++)
+	{
+		for(int b = -2; b < 2; b++)
+		{
+			float choose_mat = RandNext();
+			Vec3 center(a+0.9f * RandNext(), 0.2f, b + 0.9f * RandNext());
+			if ((center - Vec3(4.f, 0.2f, 0.f)).Magnitude() > 0.9f) {
+				if (choose_mat < 0.8f) { // Diffuse
+					list[i++] = new Sphere(center, 0.2f, new Lambertian(Vec3(RandNext() * RandNext(), RandNext() * RandNext(), RandNext() * RandNext())));
+				}
+				else if (choose_mat < 0.95f) { // Metal
+					list[i++] = new Sphere(center, 0.2f, new Metal(Vec3(0.5f * (1 + RandNext()), 0.5f * (1 + RandNext()), 0.5f * (1 + RandNext())), 0.5f * RandNext()));
+				}
+				else {// Glass
+					list[i++] = new Sphere(center, 0.2f, new Dielectric(1.5f));
+				}
+			}
+		}
+	}
+
+	list[i++] = new Sphere(Vec3(0.f, 1.f, 0.f), 1.f, new Dielectric(1.5f));
+	list[i++] = new Sphere(Vec3(-4, 1, 0), 1.0f, new Lambertian(Vec3(0.4f, 0.2f, 0.1f)));
+	list[i++] = new Sphere(Vec3(4, 1, 0), 1.0f, new Metal(Vec3(0.7f, 0.6f, 0.5f), 0.0f));
+
+	return new HittableList(list, i);
 }
 
 
@@ -273,8 +323,8 @@ int main()
 	//	for (int i = 0; i < WINDOW_WIDTH; i++)
 	//	{
 	//		int idx = j * WINDOW_WIDTH + i;
-	//		points[idx].u = i;// + static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
-	//		points[idx].v = j;// + static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+	//		points[idx].u = i;// + RandNext();
+	//		points[idx].v = j;// + RandNext();
 	//		points[idx].parameter = 2.0f;
 	//		points[idx].t = 2.f;
 	//	}
@@ -326,7 +376,7 @@ int main()
 	//float* aaRandoms = new float[PIXEL_COUNT * antiAliasingIterations];
 	//for (int i = 0; i < PIXEL_COUNT * antiAliasingIterations; i++)
 	//{
-	//	aaRandoms[i] = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+	//	aaRandoms[i] = RandNext();
 	//}
 
 	//GLuint aaSSbo;
@@ -358,13 +408,26 @@ int main()
 
 	const int nx = WINDOW_WIDTH;
 	const int ny = WINDOW_HEIGHT;
+	const int ns = 500;
 
-	/*Hittable* hittables[2];
-	hittables[0] = new Sphere(Vec3(0.f, 0.f, -1.f), 0.5f);
-	hittables[1] = new Sphere(Vec3(0.f, -100.5f, -1.f), 100.f);
-	HittableList* world = new HittableList(hittables, 2);*/
+	float radius = cos(F_PI * 0.25f);
 
-	//Camera cam;
+	/*Hittable* hittables[4];
+	hittables[0] = new Sphere(Vec3(0.f, 0.f, -1.f), radius, new Lambertian(Vec3(0.1f, 0.2f, 0.5f)));
+	hittables[1] = new Sphere(Vec3(0.f, -100 - radius, -1.f), 100, new Lambertian(Vec3(0.8f, 0.8f, 0.f)));
+	hittables[2] = new Sphere(Vec3(radius * 2.f, 0.f, -1.f), radius, new Metal(Vec3(0.8f, 0.6f, 0.2f), 0.3f));
+	hittables[3] = new Sphere(Vec3(-radius * 2.f, 0.f, -1.f), radius, new Dielectric(1.5f));
+
+	HittableList* world = new HittableList(hittables, 4);*/
+
+	HittableList* world = static_cast<HittableList*>(RandomScene());
+
+	Vec3 lookFrom(13,2,3);
+	Vec3 lookAt(0,0,0);
+	float distToFocus = (lookFrom-lookAt).Magnitude();
+	float aperture = 0.1f;
+
+	Camera cam(lookFrom, lookAt, Vec3(0,1,0), 20, float(nx)/float(ny), aperture, distToFocus);
 
 	while (!glfwWindowShouldClose(window))
 	{
@@ -394,31 +457,33 @@ int main()
 		//}
 		#pragma endregion // Compute Shader Test
 
+		printf("begin");
+		for (int j = ny - 1; j >= 0; j--)
+		{
+			printf("row done %d\n", j);
+			for (int i = 0; i < nx; i++)
+			{
+				Vec3 col(0.f, 0.f, 0.f);
+				for (int s = 0; s < ns; s++)
+				{
+					float r1 = RandNext();
+					float r2 = RandNext();
 
-		//for (int j = ny - 1; j >= 0; j--)
-		//{
-		//	for (int i = 0; i < nx; i++)
-		//	{
-		//		Vec3 col(0.f, 0.f, 0.f);
-		//		for (int s = 0; s < ns; s++)
-		//		{
-		//			float r1 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
-		//			float r2 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+					const float u = static_cast<float>(i + r1) / static_cast<float>(nx);
+					const float v = static_cast<float>(j + r2) / static_cast<float>(ny);
+					const Ray ray = cam.GetRay(u, v);
+					//const Vec3 p = ray.PointAtParameter(2.0f);
+					col += Color(ray, world, 0);
+				}
+				col /= float(ns);
+				col = Vec3(sqrt(col[0]), sqrt(col[1]), sqrt(col[2]));
+				
+				glColor3f(col.r(), col.g(), col.b());
+				glVertex2i(i, j);
+			}
+		}
 
-		//			const float u = static_cast<float>(i + r1) / static_cast<float>(nx);
-		//			const float v = static_cast<float>(j + r2) / static_cast<float>(ny);
-		//			const Ray ray = cam.GetRay(u, v);
-		//			const Vec3 p = ray.PointAtParameter(2.0f);
-		//			col += color(ray, world);
-		//		}
-		//		col /= float(ns);
-
-		//		
-		//		//glColor3f(col.r(), col.g(), col.b());
-		//		//glVertex2i(i, j);
-		//	}
-		//}
-
+		printf("nice");
 
 		glEnd();
 

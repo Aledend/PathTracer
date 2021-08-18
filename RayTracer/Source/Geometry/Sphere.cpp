@@ -1,5 +1,5 @@
-#include <math.h>
 #include "Sphere.h"
+#include <math.h>
 
 bool Sphere::Hit(const Ray& r, float tMin, float tMax, HitRecord& rec) const {
 	Vec3 oc = r.Origin() - center;
@@ -15,13 +15,15 @@ bool Sphere::Hit(const Ray& r, float tMin, float tMax, HitRecord& rec) const {
 			rec.t = temp;
 			rec.p = r.PointAtParameter(rec.t);
 			rec.normal = (rec.p - center) / radius;
+			rec.mat_ptr = material;
 			return true;
 		}
-		temp = (-b + sqrt(b*b-a*c)) / a;
+		temp = (-b + sqrt(discriminant)) / a;
 		if (temp < tMax && temp > tMin) {
 			rec.t = temp;
 			rec.p = r.PointAtParameter(rec.t);
 			rec.normal = (rec.p - center) / radius;
+			rec.mat_ptr = material;
 			return true;
 		}
 	}
