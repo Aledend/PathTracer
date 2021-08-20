@@ -13,7 +13,7 @@ This is my attempt at learning compute shaders and using them to accelerate the 
 I was quickly fascinated in the beautiful images this path tracer could provide. But there was one thing wrong with it. As complexity increased, it grew dreadfully slow. My own twist on this project is the converting of everything to using compute shaders. Offloading all that cpu work load to the gpu was challenging, but provided amazing results. My renders went from minutes to mere seconds. It even provides beautiful results at steady framerate allowing for interactive camera movement.
 
 Example of rendering a 1200x800 window, running 60 passes per pixel with a bounce depth of 50:
-![pathtrace gif](https://user-images.githubusercontent.com/16718975/130248556-fda4ce59-ab59-422d-aa28-9af18edb6bf0.mp4)
+![pathtrace gif](https://user-images.githubusercontent.com/16718975/130248556-fda4ce59-ab59-422d-aa28-9af18edb6bf0.gif)
 
 
 However, there is still much that can be done. The compute shader was thrown together as a proof of concept, there are very likely many better ways to provide uniform random behaviour, and a lot can be done to relieve the computing that has to be done. I would start by building a collision tree and relieve the gpu from passing through as many spheres as possible. I believe that most performance costs comes from bouncing however, so time will tell whether a collision tree would pay off in such a compact area, or if it only adds complexity. I would also look into sorting the spheres by material, and see if the compute shader can be relieved from the severe branching that comes with handling different materials.
