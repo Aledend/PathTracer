@@ -20,7 +20,7 @@ const int WINDOW_WIDTH = 1200;
 const int WINDOW_HEIGHT = 800;
 const int PIXEL_COUNT = WINDOW_HEIGHT * WINDOW_WIDTH;
 const int WORK_GROUP_SIZE = 300;
-const int antiAliasingIterations = 30;
+const int antiAliasingIterations = 60;
 const Vec3 cameraLookAt = Vec3(0,0,0);
 const Vec3 initialCameraPosition = Vec3(18, 4, 18);
 #define USE_COMPUTE_SHADER
@@ -446,7 +446,7 @@ void handle_key_event(GLFWwindow* window, int key, int scancode, int action, int
 	}	
 }
 
-
+// Camera controls
 void UpdateInput()
 {
 	const float cameraSpeed = 100.f;
@@ -468,7 +468,7 @@ void UpdateInput()
 }
 
 
-
+// Calculate color using ray
 Vec3 Color(const Ray& r, HittableList* world, int depth) {
 	HitRecord rec;
 	constexpr float floatMax = std::numeric_limits<float>::max();
@@ -492,6 +492,7 @@ Vec3 Color(const Ray& r, HittableList* world, int depth) {
 	}
 }
 
+// Generate scene with Spheres of various materials
 HittableList* RandomScene() {
 	const int n = 20;
 	Hittable** list = new Hittable*[n];
