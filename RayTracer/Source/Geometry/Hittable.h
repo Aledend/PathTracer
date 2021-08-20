@@ -6,7 +6,7 @@ class Material;
 
 struct HitRecord {
 
-	HitRecord() : t(0.f), mat_ptr(0) {};
+	HitRecord() = default;
 	
 	float t;
 	Vec3 p;

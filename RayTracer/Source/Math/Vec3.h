@@ -6,14 +6,8 @@
 class Vec3
 {
 public:
-	Vec3() : e() {}
+	Vec3() = default;
 	Vec3(float e0, float e1, float e2) { e[0] = e0; e[1] = e1; e[2] = e2; }
-	inline float x() const { return e[0]; }
-	inline float y() const { return e[1]; }
-	inline float z() const { return e[2]; }
-	inline float r() const { return e[0]; }
-	inline float g() const { return e[1]; }
-	inline float b() const { return e[2]; }
 
 	inline const Vec3& operator+() const { return *this; }
 	inline Vec3 operator-() const { return Vec3(-e[0], -e[1], -e[2]); }
@@ -23,15 +17,17 @@ public:
 
 
 	inline Vec3& operator+=(const Vec3& v) {
-		e[0] += v.x();
-		e[1] += v.y();
-		e[2] += v.z();
+		e[0] += v.x;
+		e[1] += v.y;
+		e[2] += v.z;
 		return *this;
 	}
-	inline Vec3& operator-=(const Vec3 &v);
-	inline Vec3& operator*=(const Vec3 &v);
-	inline Vec3& operator/=(const Vec3 &v);
-	inline Vec3& operator*=(const float t);
+	inline Vec3& operator*=(const float t) {
+		e[0] *= t;
+		e[1] *= t;
+		e[2] *= t;
+		return *this;
+	}
 	inline Vec3& operator/=(const float t) {
 		e[0] /= t;
 		e[1] /= t;
@@ -40,10 +36,10 @@ public:
 	}
 
 	inline Vec3 operator*(const float& t) const {
-		return Vec3(x() * t, y() * t, z() * t);
+		return Vec3(x * t, y * t, z * t);
 	}
 	inline Vec3 operator*(const Vec3& v) const {
-		return Vec3(x() * v.x(), y() * v.y(), z() * v.z());
+		return Vec3(x * v.x, y * v.y, z * v.z);
 	}
 	inline friend Vec3 operator*(float t, Vec3 v) {
 		return v * t;
@@ -51,32 +47,32 @@ public:
 	
 
 	inline Vec3 operator/(const float& t) const {
-		return Vec3(x() / t, y() / t, z() / t);
+		return Vec3(x / t, y / t, z / t);
 	}
 
 	inline Vec3 operator+(const Vec3& v) const {
-		return Vec3(x() + v.x(), y() + v.y(), z() + v.z());
+		return Vec3(x + v.x, y + v.y, z + v.z);
 	}
 
 	inline Vec3 operator-(const Vec3& v) const {
-		return Vec3(x() - v.x(), y() - v.y(), z() - v.z());
+		return Vec3(x - v.x, y - v.y, z - v.z);
 	}
 
 	inline static float Dot(const Vec3& v1, const Vec3& v2) {
-		return v1.x() * v2.x() + v1.y() * v2.y() + v1.z() * v2.z();
+		return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
 	}
 
 	inline static Vec3 Cross(const Vec3& v1, const Vec3& v2) {
-		return Vec3(v1.y() * v2.z() - v1.z() * v2.y(),
-			-(v1.x() * v2.z() - v1.z() * v2.x()),
-			v1.x() * v2.y() - v1.y() * v2.x());
+		return Vec3(v1.y * v2.z - v1.z * v2.y,
+			-(v1.x * v2.z - v1.z * v2.x),
+			v1.x * v2.y - v1.y * v2.x);
 	}
 
 
 
 
 	inline float SqrMagnitude() const {
-		return x() * x() + y() * y() + z() * z();
+		return x * x + y * y + z * z;
 	}
 	inline float Magnitude() const {
 		return sqrt(SqrMagnitude());
@@ -92,6 +88,10 @@ public:
 	}
 
 
+	union {
+		struct{ float x, y, z; };
+		struct{ float r, g, b; };
+		struct{ float e[3]; };
+	};
 
-	float e[3];
 };

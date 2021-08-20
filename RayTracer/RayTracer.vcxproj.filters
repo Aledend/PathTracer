@@ -21,9 +21,6 @@
     <ClCompile Include="Source\Math\Ray.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Math\Vec3.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Physics\Collision.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -69,6 +66,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Source\Math\MathUtility.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Math\Vec4.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\Perlin.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

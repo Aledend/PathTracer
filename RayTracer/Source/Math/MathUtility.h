@@ -20,8 +20,8 @@ inline Vec3 RandomInUnitSphere() {
 		float r2 = RandNext();
 		float r3 = RandNext();
 		p = 2.0 * Vec3(r1, r2, r3) - Vec3(1, 1, 1);
-	} while (p.SqrMagnitude() >= 1.0f);
-	return p;
+	} while (p.SqrMagnitude() > 1.0f);
+	return p.Normalized();
 }
 
 inline Vec3 RandomInUnitDisk() {
@@ -30,8 +30,8 @@ inline Vec3 RandomInUnitDisk() {
 		float r1 = RandNext() * 2 - 1;
 		float r2 = RandNext() * 2 - 1;
 		p = Vec3(r1, r2, 0.f);
-	} while (p.SqrMagnitude() >= 1.0f);
-	return p;
+	} while (p.SqrMagnitude() > 1.0f);
+	return p.Normalized();
 }
 
 inline Vec3 Reflect(const Vec3& v, const Vec3& n) {

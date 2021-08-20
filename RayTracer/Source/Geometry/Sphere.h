@@ -6,7 +6,7 @@
 class Sphere : public Hittable
 {
 public:
-	Sphere() : radius(0), material(0) {}
+	Sphere() = default;
 	Sphere(Vec3 cen, float r, Material* mat) : center(cen), radius(r), material(mat) {};
 	~Sphere() { delete material; material = nullptr; }
 
