@@ -1,7 +1,4 @@
 #pragma once
-#ifndef RAY_H
-#define RAY_H
-
 #include "Math/Vec3.h"
 
 class Ray
@@ -16,5 +13,3 @@ public:
 	Vec3 A;
 	Vec3 B;
 };
-
-#endif // !RAY_H

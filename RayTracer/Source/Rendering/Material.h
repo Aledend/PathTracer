@@ -14,9 +14,10 @@ enum class MaterialType
 class Material
 {
 public:
+	Material() = default;
 	virtual bool Scatter(const Ray& r_in, const HitRecord& rec, Vec3& attenuation, Ray& scattered) const = 0 ;
 
-	MaterialType matType;
+	MaterialType matType = {};
 };
 
 class Lambertian : public Material

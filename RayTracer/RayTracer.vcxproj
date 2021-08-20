@@ -149,24 +149,17 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Source\Rendering\Material.cpp" />
-    <ClCompile Include="Source\Rendering\Camera.cpp" />
     <ClCompile Include="Source\Framework\HittableList.cpp" />
-    <ClCompile Include="Source\Geometry\Hittable.cpp" />
-    <ClCompile Include="Source\Physics\Collision.cpp" />
-    <ClCompile Include="Source\Math\Ray.cpp" />
     <ClCompile Include="Source\main.cpp" />
     <ClCompile Include="Source\Geometry\Sphere.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Source\Framework\Perlin.h" />
     <ClInclude Include="Source\Math\MathUtility.h" />
     <ClInclude Include="Source\Math\Vec4.h" />
     <ClInclude Include="Source\Rendering\Material.h" />
     <ClInclude Include="Source\Rendering\Camera.h" />
     <ClInclude Include="Source\Framework\HittableList.h" />
     <ClInclude Include="Source\Geometry\Hittable.h" />
-    <ClInclude Include="Source\Physics\Collision.h" />
     <ClInclude Include="Source\Math\Ray.h" />
     <ClInclude Include="Source\Math\Vec3.h" />
     <ClInclude Include="Source\Geometry\Sphere.h" />

@@ -3,34 +3,29 @@
 #include <math.h>
 #include "Math/Vec3.h"
 
-// Constants
+//////////////////// Constants ////////////////////
 constexpr float F_PI = 3.1415926f;
 
 
-
+//////////////////// Utility Functions ////////////////////
 inline float RandNext() {
 	return static_cast<float>(rand()) / (RAND_MAX + 1);
 }
 
-// Replace with gaussian distribution
 inline Vec3 RandomInUnitSphere() {
-	Vec3 p;
-	do {
-		float r1 = RandNext();
-		float r2 = RandNext();
-		float r3 = RandNext();
-		p = 2.0 * Vec3(r1, r2, r3) - Vec3(1, 1, 1);
-	} while (p.SqrMagnitude() > 1.0f);
-	return p.Normalized();
+
+	float z = (RandNext() - 0.5f) * 1.99f;
+	float rxy = sqrt(1 - z * z);
+	float phi = RandNext() * 2 * F_PI;
+	float x = rxy * cos(phi);
+	float y = rxy * sin(phi);
+
+	return Vec3(x, y, z).Normalized();
 }
 
 inline Vec3 RandomInUnitDisk() {
-	Vec3 p;
-	do {
-		float r1 = RandNext() * 2 - 1;
-		float r2 = RandNext() * 2 - 1;
-		p = Vec3(r1, r2, 0.f);
-	} while (p.SqrMagnitude() > 1.0f);
+	Vec3 p = RandomInUnitSphere();
+	p.z = 0;
 	return p.Normalized();
 }
 
