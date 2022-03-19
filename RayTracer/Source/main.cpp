@@ -5,36 +5,31 @@
 #include "Math/MathUtility.h"
 #include "Math/Vec3.h"
 #include "Math/Vec4.h"
-#include "Math/Ray.h"
-#include "Geometry/Hittable.h"
 #include "Geometry/Sphere.h"
-#include "Framework/HittableList.h"
 #include "Rendering/Camera.h"
+#include <vector>
+#include <chrono>
+#define _USE_MATH_DEFINES
+#include <math.h>
+#include <algorithm>
 
 
 /*
 	Variables to control program
 */
-
 const int WINDOW_WIDTH = 1200;
 const int WINDOW_HEIGHT = 800;
 const int PIXEL_COUNT = WINDOW_HEIGHT * WINDOW_WIDTH;
 const int WORK_GROUP_SIZE = 300;
-const int antiAliasingIterations = 60;
-const Vec3 cameraLookAt = Vec3(0,0,0);
-const Vec3 initialCameraPosition = Vec3(18, 4, 18);
-#define USE_COMPUTE_SHADER
+const int AA_ITERATIONS = 20;
+const int SPHERE_COUNT = 20; // One sphere is reserverd for the ground
+const Vec3 CAMERA_LOOK_AT = Vec3(0,0.5f,0);
+const Vec3 INITIAL_CAMERA_POSITION = Vec3(18, 4, 18);
 
+const float CAMERA_ANGULAR_SPEED_HORIZONTAL = static_cast<float>(M_PI / 2);
+const float CAMERA_ANGULAR_SPEED_VERTICAL = static_cast<float>(M_PI / 4);
+const float CAMERA_FORWARD_MULTIPLIER = 0.2f; // Value between 0 and 1;
 
-/*
-	Global convenience variables
-*/
-GLuint camSSbo;
-Camera cam;
-bool wHeld;
-bool aHeld;
-bool sHeld;
-bool dHeld;
 
 /*
 	Structs used to send data to compute shader
@@ -48,18 +43,18 @@ struct SphereData {
 	Vec4 center;
 	Vec4 albedo;
 	float fuzz;
-	float reflectionIndex;
-	int matType;
+	float reflection_index;
+	int mat_type;
 	float padd;
 };
 
 struct CameraData {
 	Vec4 origin;
-	Vec4 lowerLeftCorner;
+	Vec4 lower_left_corner;
 	Vec4 horizontal;
 	Vec4 vertical;
 	Vec4 u, v, w;
-	float lensRadius;
+	float lens_radius;
 };
 
 /*
@@ -391,15 +386,15 @@ void main()
 
 
 
-void SetupCamera(Vec3 lookFrom)
+void SetupCamera(Camera& cam, const Vec3& look_from)
 {
-	float distToFocus = (lookFrom - cameraLookAt).Magnitude();
+	float dist_to_focus = (look_from - CAMERA_LOOK_AT).Magnitude();
 	float aperture = 0.1f;
 
-	cam = Camera(lookFrom, cameraLookAt, Vec3(0, 1, 0), 20, static_cast<float>(WINDOW_WIDTH) / WINDOW_HEIGHT, aperture, distToFocus);
+	cam.Set(look_from, CAMERA_LOOK_AT, Vec3(0, 1, 0), 20, static_cast<float>(WINDOW_WIDTH) / WINDOW_HEIGHT, aperture, dist_to_focus);
 }
 
-void SendCameraDataToComputeShader() {
+void SendCameraDataToComputeShader(const Camera& cam) {
 	CameraData camstruct{
 		cam.origin,
 		cam.lowerLeftCorner,
@@ -408,132 +403,120 @@ void SendCameraDataToComputeShader() {
 		cam.u,
 		cam.v,
 		cam.w,
-		cam.lensRadius
+		cam.lens_radius
 	};
 
+	GLuint camSSbo;
 	glGenBuffers(1, &camSSbo);
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, camSSbo);
 	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(CameraData), &camstruct, GL_STATIC_DRAW);
 }
 
-void handle_key_event(GLFWwindow* window, int key, int scancode, int action, int modifiers)
-{
-
-	if(key == GLFW_KEY_ESCAPE)
-		glfwDestroyWindow(window);
-
-	if (action == GLFW_PRESS)
-	{
-		if(key == GLFW_KEY_W)
-			wHeld = true;
-		else if(key == GLFW_KEY_S)
-			sHeld = true;
-		else if(key == GLFW_KEY_A)
-			aHeld = true;
-		else if(key == GLFW_KEY_D)
-			dHeld = true;
-	}
-	else if(action == GLFW_RELEASE)
-	{
-		if(key == GLFW_KEY_W)
-			wHeld = false;
-		else if(key == GLFW_KEY_S)
-			sHeld = false;
-		else if(key == GLFW_KEY_A)
-			aHeld = false;
-		else if(key == GLFW_KEY_D)
-			dHeld = false;
-	}	
-}
-
 // Camera controls
-void UpdateInput()
+void UpdateCamera(GLFWwindow* window, Camera& cam, const float delta_time)
 {
-	const float cameraSpeed = 100.f;
-	if (wHeld || sHeld || aHeld || dHeld)
-	{
-		Vec3 newLookFrom = cam.origin;
-		if (wHeld)
-			newLookFrom += -cam.origin.Normalized();
-		else if (sHeld)
-			newLookFrom += cam.origin.Normalized();
-		else if (aHeld)
-			newLookFrom += Vec3::Cross(cam.origin, Vec3(0, 1, 0)).Normalized();
-		else if (dHeld)
-			newLookFrom += Vec3::Cross(-cam.origin, Vec3(0, 1, 0)).Normalized();
+	Vec3 position = cam.origin;
+	Vec3 look_at = CAMERA_LOOK_AT;
 
-		SetupCamera(newLookFrom);
-		SendCameraDataToComputeShader();
-	}
+	Vec3 vec_from_lookat = position - look_at;
+
+	//// Forward/backward movement
+	const float min_distance = 5.f;
+	float dist_from_lookat = vec_from_lookat.Magnitude();
+	float forward_multiplier = std::clamp(CAMERA_FORWARD_MULTIPLIER * delta_time, 0.f, 0.9f);
+
+	if (min_distance < dist_from_lookat && glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+		position -= vec_from_lookat.Normalized() * (1 - CAMERA_FORWARD_MULTIPLIER * delta_time);
+	if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+		position += vec_from_lookat.Normalized() * (1 + CAMERA_FORWARD_MULTIPLIER * delta_time);
+
+	
+	
+	// Left/right movement
+	vec_from_lookat = position - look_at;
+	float flat_angle = atan2(vec_from_lookat.z, vec_from_lookat.x);
+	const float flat_dist_from_lookat = sqrt(vec_from_lookat.x * vec_from_lookat.x + vec_from_lookat.z * vec_from_lookat.z);
+
+	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+		flat_angle -= CAMERA_ANGULAR_SPEED_HORIZONTAL * delta_time;
+	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+		flat_angle += CAMERA_ANGULAR_SPEED_HORIZONTAL * delta_time;
+
+	position.x = cos(flat_angle) * flat_dist_from_lookat + look_at.x;
+	position.z = sin(flat_angle) * flat_dist_from_lookat + look_at.z;
+
+	// Up/down movement
+	vec_from_lookat = position - look_at;
+	const float vertical_angle = atan2(vec_from_lookat.y, flat_dist_from_lookat);
+	float new_vertical_angle = vertical_angle;
+	if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
+		new_vertical_angle += CAMERA_ANGULAR_SPEED_VERTICAL * delta_time;
+	if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
+		new_vertical_angle -= CAMERA_ANGULAR_SPEED_VERTICAL * delta_time;
+
+	new_vertical_angle = std::clamp(new_vertical_angle, 0.f, 0.9f);
+
+	float test_new_dist = sqrt(vec_from_lookat.x * vec_from_lookat.x + vec_from_lookat.z * vec_from_lookat.z);
+	dist_from_lookat = vec_from_lookat.Magnitude();
+	position.y = sin(new_vertical_angle) * dist_from_lookat + look_at.y;
+	const float new_flat_dist = abs(cos(new_vertical_angle)) * dist_from_lookat;
+	position.x *= new_flat_dist / flat_dist_from_lookat;
+	position.z *= new_flat_dist / flat_dist_from_lookat;
+
+	SetupCamera(cam, position);
+	SendCameraDataToComputeShader(cam);
 }
 
-
-// Calculate color using ray
-Vec3 Color(const Ray& r, HittableList* world, int depth) {
-	HitRecord rec;
-	constexpr float floatMax = std::numeric_limits<float>::max();
-
-	if (world->Hit(r, 0.001f, floatMax, rec))
-	{
-		Ray scattered;
-		Vec3 attenuation;
-		if (depth < 50 && rec.mat_ptr->Scatter(r, rec, attenuation, scattered)) {
-			return attenuation * Color(scattered, world, depth + 1);
-		}
-		else {
-			return Vec3(0,0,0);
-		}
+Material GenerateRandomMaterial()
+{
+	float choose_mat = RandNext();
+	if (choose_mat < 0.8f) { // Diffuse
+		return Material(Lambertian(Vec3(RandNext() * RandNext(), RandNext() * RandNext(), RandNext() * RandNext())));
 	}
-	else
-	{
-		Vec3 unitDirection = r.Direction().Normalized();
-		float t = 0.5f * (unitDirection.y + 1.0f);
-		return (1.0f - t) * Vec3(1.0f, 1.0f, 1.0f) + t * Vec3(0.5f, 0.7f, 1.0f);
+	else if (choose_mat < 0.95f) { // Metal
+		return Material(Metal(Vec3(0.5f * (1 + RandNext()), 0.5f * (1 + RandNext()), 0.5f * (1 + RandNext())), 0.5f * RandNext()));
+	}
+	else { // Glass
+		return Material(Dielectric(1.5f));
 	}
 }
 
 // Generate scene with Spheres of various materials
-HittableList* RandomScene() {
-	const int n = 20;
-	Hittable** list = new Hittable*[n];
-	list[0] = new Sphere(Vec3(0, -1000, 0), 1000, new Lambertian(Vec3(0.5f, 0.5f, 0.5f)));
-	int i = 1;
+std::vector<Sphere> RandomScene(const int sphere_count) {
+	const float golden_ratio = 1.6180340f;
+	auto spheres = std::vector<Sphere>(std::max(sphere_count, 4));
 
-	for (int a = -2; a < 2; a++)
+	// Sphere to make up the ground
+	spheres[0] = Sphere(Vec3(0, -1000, 0), 1000, Lambertian(Vec3(0.5f, 0.5f, 0.5f)));
+	// Three default spheres
+	spheres[1] = Sphere(Vec3(0.f, 1.f, 0.f), 1.f, Dielectric(1.5f));
+	spheres[2] = Sphere(Vec3(-4, 1, 0), 1.f, Lambertian(Vec3(0.4f, 0.2f, 0.1f)));
+	spheres[3] = Sphere(Vec3(4, 1, 0), 1.f, Metal(Vec3(0.7f, 0.6f, 0.5f), 0.0f));
+
+	// Create small spheres
+	int i = 4;
+	for (; i < sphere_count; i++)
 	{
-		for(int b = -2; b < 2; b++)
-		{
-			float choose_mat = RandNext();
-			Vec3 center(a+0.9f * RandNext(), 0.2f, b + 0.9f * RandNext());
-			if ((center - Vec3(4.f, 0.2f, 0.f)).Magnitude() > 0.9f) {
-				if (choose_mat < 0.8f) { // Diffuse
-					list[i++] = new Sphere(center, 0.2f, new Lambertian(Vec3(RandNext() * RandNext(), RandNext() * RandNext(), RandNext() * RandNext())));
-				}
-				else if (choose_mat < 0.95f) { // Metal
-					list[i++] = new Sphere(center, 0.2f, new Metal(Vec3(0.5f * (1 + RandNext()), 0.5f * (1 + RandNext()), 0.5f * (1 + RandNext())), 0.5f * RandNext()));
-				}
-				else { // Glass
-					list[i++] = new Sphere(center, 0.2f, new Dielectric(1.5f));
-				}
-			}
-		}
+		const float angle = golden_ratio * i;
+		const float dist = angle * 0.2f + 1;
+		const Vec3 center(cos(angle) * dist, 0.2f, sin(angle) * dist);
+		
+		spheres[i] = Sphere(center, 0.2f, GenerateRandomMaterial());
 	}
 
-	list[i++] = new Sphere(Vec3(0.f, 1.f, 0.f), 1.f, new Dielectric(1.5f));
-	list[i++] = new Sphere(Vec3(-4, 1, 0), 1.f, new Lambertian(Vec3(0.4f, 0.2f, 0.1f)));
-	list[i++] = new Sphere(Vec3(4, 1, 0), 1.f, new Metal(Vec3(0.7f, 0.6f, 0.5f), 0.0f));
-
-	return new HittableList(list, i);
+	return spheres;
 }
+
+///////////////////////////////////////////////////////////////
+////////////////////////// MAIN LOOP //////////////////////////
+///////////////////////////////////////////////////////////////
 
 int main()
 {
-
+	///////////////////// Setup glfw and glew /////////////////////
 	glfwInit();
 	GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Path Tracer", NULL, NULL);
 	glfwMakeContextCurrent(window);
-
-	glfwSetKeyCallback(window, handle_key_event);
 
 	glewInit();
 	glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
@@ -541,63 +524,62 @@ int main()
 	glLoadIdentity();
 	glOrtho(0, WINDOW_WIDTH, 0, WINDOW_HEIGHT, -1, 1);
 
-	// Generate Spheres
-	HittableList* world = static_cast<HittableList*>(RandomScene());
+	Camera cam;
+	SetupCamera(cam, INITIAL_CAMERA_POSITION);
 
-	SetupCamera(initialCameraPosition);
 
-	#ifdef USE_COMPUTE_SHADER 
+	////////////////////// Generate spheres ///////////////////////
+	std::vector<Sphere> spheres = RandomScene(SPHERE_COUNT);
 
 
 	//////////////////////// Setup shaders ////////////////////////
-	GLuint compShader = glCreateShader(GL_COMPUTE_SHADER);
-	glShaderSource(compShader, 1, &CALC_SRC, NULL);
-	glCompileShader(compShader);
+	GLuint comp_shader = glCreateShader(GL_COMPUTE_SHADER);
+	glShaderSource(comp_shader, 1, &CALC_SRC, NULL);
+	glCompileShader(comp_shader);
 
 	static char LOG_BUFFER[1024];
-	glGetShaderInfoLog(compShader, 1024, NULL, LOG_BUFFER);
+	glGetShaderInfoLog(comp_shader, 1024, NULL, LOG_BUFFER);
 
 	printf(LOG_BUFFER);
 
-
 	//////////////////////// Setup program ////////////////////////
 	GLuint program = glCreateProgram();
-	glAttachShader(program, compShader);
+	glAttachShader(program, comp_shader);
 	glLinkProgram(program);
 
-	GLint u_Time = glGetUniformLocation(program, "time");
-	GLint u_SphereCount = glGetUniformLocation(program, "sphereCount");
-	GLint u_AAIterations = glGetUniformLocation(program, "aaIterations");
-	GLint u_WindowWidth = glGetUniformLocation(program, "windowWidth");
-	GLint u_WindowHeight = glGetUniformLocation(program, "windowHeight");
+	GLint u_time = glGetUniformLocation(program, "time");
+	GLint u_sphereCount = glGetUniformLocation(program, "sphereCount");
+	GLint u_aa_iterations = glGetUniformLocation(program, "aaIterations");
+	GLint u_window_width = glGetUniformLocation(program, "windowWidth");
+	GLint u_window_height = glGetUniformLocation(program, "windowHeight");
 
 	glUseProgram(program);
 
 
 	//////////////////////// Setup output texture //////////////////////// 
-	GLuint texOutput;
-	glGenTextures(1, &texOutput);
+	GLuint tex_output;
+	glGenTextures(1, &tex_output);
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, texOutput);
+	glBindTexture(GL_TEXTURE_2D, tex_output);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, WINDOW_WIDTH, WINDOW_HEIGHT, 0, GL_RGBA, GL_FLOAT,
 		NULL);
-	glBindImageTexture(0, texOutput, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+	glBindImageTexture(0, tex_output, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 
 	
-	glUniform1i(u_WindowWidth, WINDOW_WIDTH);
-	glUniform1i(u_WindowHeight, WINDOW_HEIGHT);
+	glUniform1i(u_window_width, WINDOW_WIDTH);
+	glUniform1i(u_window_height, WINDOW_HEIGHT);
 
 
 	//////////////////////// Send camera data ////////////////////////
-	SendCameraDataToComputeShader();
+	SendCameraDataToComputeShader(cam);
 
 
-	//////////////////////// Fill a buffer with window coordinates ////////////////////////
-	WindowCoords* points = new WindowCoords[PIXEL_COUNT];
+	///////////// Fill a buffer with window coordinates /////////////
+	std::vector<WindowCoords> points(PIXEL_COUNT);
 
 	for (int j = WINDOW_HEIGHT - 1; j >= 0; j--)
 	{
@@ -608,73 +590,69 @@ int main()
 			points[idx].y = j;
 		}
 	}
-	GLuint posSSbo;
-	glGenBuffers(1, &posSSbo);
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, posSSbo);
-	glBufferData(GL_SHADER_STORAGE_BUFFER, PIXEL_COUNT * sizeof(WindowCoords), points, GL_STATIC_DRAW);
+	GLuint pos_ssbo;
+	glGenBuffers(1, &pos_ssbo);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, pos_ssbo);
+	glBufferData(GL_SHADER_STORAGE_BUFFER, PIXEL_COUNT * sizeof(WindowCoords), points.data(), GL_STATIC_DRAW);
 
 
 	
 
-	//////////////////////// Gather sphere data for compute shader ////////////////////////
-	int sphereCount = world->listSize;
-	SphereData* sphereDatas = new SphereData[sphereCount];
+	////////////// Gather sphere data for compute shader ////////////////
+	std::vector<SphereData> sphere_datas(SPHERE_COUNT);
 
-	for (int i = 0; i < sphereCount; i++)
+	for (int i = 0; i < SPHERE_COUNT; i++)
 	{
-		Sphere* sphere = static_cast<Sphere*>(world->list[i]);
-		sphereDatas[i].center = sphere->center;
-		sphereDatas[i].center.w = sphere->radius;
+		SphereData& sphere_data = sphere_datas[i];
 
-		if (Lambertian* lamb = dynamic_cast<Lambertian*>(sphere->material))
+		const Sphere& sphere = spheres[i];
+		sphere_data.center = sphere.center;
+		sphere_data.center.w = sphere.radius;
+
+
+		const Material& material = sphere.material;
+		switch (material.matType)
 		{
-			sphereDatas[i].albedo = lamb->albedo;
-			sphereDatas[i].matType = 0;
+		case MaterialType::Dielectric:
+			sphere_data.reflection_index = material.dielectric.reflection_index;
+			break;
+		case MaterialType::Lambertian:
+			sphere_data.albedo = material.lambertian.albedo;
+			break;
+		case MaterialType::Metal:
+			sphere_data.albedo = material.metal.albedo;
+			sphere_data.fuzz = material.metal.fuzz;
+			break;
 		}
-		else if (Metal* met = dynamic_cast<Metal*>(sphere->material))
-		{
-			sphereDatas[i].albedo = met->albedo;
-			sphereDatas[i].fuzz = met->fuzz;
-			sphereDatas[i].matType = 1;
-		}
-		else if (Dielectric* die = dynamic_cast<Dielectric*>(sphere->material))
-		{
-			sphereDatas[i].reflectionIndex = die->reflectionIndex;
-			sphereDatas[i].matType = 2;
-		}
+		sphere_data.mat_type = static_cast<int>(material.matType);
 	}
-	GLuint sphereSSbo;
-	glGenBuffers(1, &sphereSSbo);
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, sphereSSbo);
-	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(SphereData) * sphereCount, sphereDatas, GL_STATIC_DRAW);
+	GLuint sphere_ssbo;
+	glGenBuffers(1, &sphere_ssbo);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, sphere_ssbo);
+	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(SphereData) * SPHERE_COUNT, sphere_datas.data(), GL_STATIC_DRAW);
 
 
-	glUniform1i(u_SphereCount, sphereCount);
-	glUniform1i(u_AAIterations, antiAliasingIterations);
-
-	#endif
+	glUniform1i(u_sphereCount, SPHERE_COUNT);
+	glUniform1i(u_aa_iterations, AA_ITERATIONS);
 	
 	
+	auto frame_start = std::chrono::steady_clock::now();
+
 	//////////////////////// Render Loop ////////////////////////
 	while (!glfwWindowShouldClose(window))
 	{
-		double time = glfwGetTime();
-
 		glClearColor(0.1f, 0.1f, 0.8f, 1.f);
 		glClear(GL_COLOR_BUFFER_BIT);
 		
-
-#ifdef USE_COMPUTE_SHADER
+		const double time = glfwGetTime();
 		glUseProgram(program);
-		glUniform1f(u_Time, static_cast<float>(time));
+		glUniform1f(u_time, static_cast<float>(time));
 
 		glDispatchCompute(PIXEL_COUNT / WORK_GROUP_SIZE, 1, 1);
 		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
-		
 
-
-		glBindTexture(GL_TEXTURE_2D, texOutput);
+		glBindTexture(GL_TEXTURE_2D, tex_output);
 		glEnable(GL_TEXTURE_2D);
 		glBegin(GL_QUADS);
 		glTexCoord2i(0, 1); glVertex2i(0, WINDOW_HEIGHT);
@@ -685,52 +663,17 @@ int main()
 		glDisable(GL_TEXTURE_2D);
 		glBindTexture(GL_TEXTURE_2D, 0);
 		glFlush();
-#else
-
-		glBegin(GL_POINTS);
-		for (int j = WINDOW_HEIGHT - 1; j >= 0; j--)
-		{
-			printf("row done %d\n", j);
-			for (int i = 0; i < WINDOW_WIDTH; i++)
-			{
-				Vec3 col(0.f, 0.f, 0.f);
-				for (int s = 0; s < antiAliasingIterations; s++)
-				{
-					float r1 = RandNext();
-					float r2 = RandNext();
-
-					const float u = static_cast<float>(i + r1) / WINDOW_WIDTH;
-					const float v = static_cast<float>(j + r2) / WINDOW_HEIGHT;
-					const Ray ray = cam.GetRay(u, v);
-
-					col += Color(ray, world, 0);
-				}
-				col /= static_cast<float>(antiAliasingIterations);
-				
-				glColor3f(col.r, col.g, col.b);
-				glVertex2i(i, j);
-			}
-		}
-		glEnd();
-
-#endif
 
 		glfwSwapBuffers(window);
-		double delta = glfwGetTime() - time;
+		const auto frame_end = std::chrono::steady_clock::now();
+		const auto frame_delta = std::chrono::duration_cast<std::chrono::nanoseconds>(frame_end - frame_start).count();
+		frame_start = std::chrono::steady_clock::now();
+		const float delta_time = static_cast<float>(frame_delta / 1000000000.0);
+		
 		glfwPollEvents();
+		UpdateCamera(window, cam, delta_time);
 
-		UpdateInput();
-
-		double fps = 1.f / delta;
-		// Input causes severe deltatime spikes. Limit prints to 120 fps.
-		if(fps < 120.f)
-			printf("Fps: %f\n", 1.f / delta);
+		const float fps = 1.f / delta_time;
+		printf("Fps: %f\n", fps);
 	}
-
-	////////////////////////  Cleanup //////////////////////// 
-	delete world;
-	
-	#ifdef USE_COMPUTE_SHADER
-	delete[] sphereDatas;
-	#endif
 }

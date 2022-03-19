@@ -1,31 +1,26 @@
 #pragma once
 #include "Math/Vec3.h"
-#include "Math/Ray.h"
-#include "Math/MathUtility.h"
-#include <cmath>
+#define _USE_MATH_DEFINES
+#include <math.h>
 
 class Camera
 {
 public:
 	Camera() = default;
-	Camera(Vec3 lookFrom, Vec3 lookAt, Vec3 vUp, float vfov, float aspect, float aperture, float focusDist) {
-		lensRadius = aperture * 0.5f;
-		float theta = vfov * F_PI / 180;
-		float halfHeight = tan(theta*0.5f) * 2.f;
-		float halfWidth = aspect * halfHeight;
-		origin = lookFrom;
-		w = (lookFrom - lookAt).Normalized();
-		u = Vec3::Cross(vUp,w).Normalized();
-		v = Vec3::Cross(w, u);
-		horizontal = halfWidth * focusDist * u;
-		vertical = halfHeight * focusDist * v;
-		lowerLeftCorner = origin - horizontal * 0.5f - vertical * 0.5f - focusDist * w;
-	}
 
-	Ray GetRay(float s, float t) {
-		Vec3 rd = lensRadius * RandomInUnitDisk();
-		Vec3 offset = u * rd.x + v * rd.y;
-		return Ray(origin + offset, lowerLeftCorner + s*horizontal + t*vertical - origin - offset); 
+	void Set(const Vec3& look_from, const Vec3& look_at, const Vec3& v_up, float v_fov, float aspect, float aperture, float focus_dist) 
+	{
+		lens_radius = aperture * 0.5f;
+		const float half_theta = v_fov * static_cast<float>(M_PI / 180) * 0.5f;
+		const float half_height = static_cast<float>(tan(half_theta)) * 2.f;
+		const float half_width = aspect * half_height;
+		origin = look_from;
+		w = (look_from - look_at).Normalized();
+		u = Vec3::Cross(v_up, w).Normalized();
+		v = Vec3::Cross(w, u);
+		horizontal = half_width * focus_dist * u;
+		vertical = half_height * focus_dist * v;
+		lowerLeftCorner = origin - horizontal * 0.5f - vertical * 0.5f - focus_dist * w;
 	}
 
 	Vec3 origin;
@@ -33,6 +28,6 @@ public:
 	Vec3 horizontal;
 	Vec3 vertical;
 	Vec3 u, v, w;
-	float lensRadius;
+	float lens_radius;
 };
 

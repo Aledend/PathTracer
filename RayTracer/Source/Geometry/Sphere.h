@@ -1,18 +1,15 @@
 #pragma once
 #include "Rendering/Material.h"
-#include "Geometry/Hittable.h"
 #include "Math/Vec3.h"
 
-class Sphere : public Hittable
+class Sphere
 {
 public:
 	Sphere() = default;
-	Sphere(Vec3 cen, float r, Material* mat) : center(cen), radius(r), material(mat) {};
-	~Sphere() { delete material; material = nullptr; }
+	Sphere(const Vec3& cen, float r, const Material& mat) : center(cen), radius(r), material(mat) {};
 
-	virtual bool Hit(const Ray& r, float tmin, float tMax, HitRecord& rec) const;
-	Material* material; 
 	Vec3 center;
 	float radius;
+	Material material;
 };
 
