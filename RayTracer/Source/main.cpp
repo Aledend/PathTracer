@@ -23,8 +23,9 @@ const int PIXEL_COUNT = WINDOW_HEIGHT * WINDOW_WIDTH;
 const int WORK_GROUP_SIZE = 300;
 const int AA_ITERATIONS = 20;
 const int SPHERE_COUNT = 20; // One sphere is reserverd for the ground
-const Vec3 CAMERA_LOOK_AT = Vec3(0,0.5f,0);
+const Vec3 CAMERA_LOOK_AT = Vec3(0,1.f,0);
 const Vec3 INITIAL_CAMERA_POSITION = Vec3(18, 4, 18);
+const float SPHERE_MOVE_SPEED = 0.55f;
 
 const float CAMERA_ANGULAR_SPEED_HORIZONTAL = static_cast<float>(M_PI / 2);
 const float CAMERA_ANGULAR_SPEED_VERTICAL = static_cast<float>(M_PI / 4);
@@ -487,11 +488,11 @@ std::vector<Sphere> RandomScene(const int sphere_count) {
 	auto spheres = std::vector<Sphere>(std::max(sphere_count, 4));
 
 	// Sphere to make up the ground
-	spheres[0] = Sphere(Vec3(0, -1000, 0), 1000, Lambertian(Vec3(0.5f, 0.5f, 0.5f)));
+	spheres[0] = Sphere(Vec3(0, -1000, 0), 1000, Lambertian(Vec3(0.5f, 0.5f, 0.5f)), RandomDirection() * SPHERE_MOVE_SPEED);
 	// Three default spheres
-	spheres[1] = Sphere(Vec3(0.f, 1.f, 0.f), 1.f, Dielectric(1.5f));
-	spheres[2] = Sphere(Vec3(-4, 1, 0), 1.f, Lambertian(Vec3(0.4f, 0.2f, 0.1f)));
-	spheres[3] = Sphere(Vec3(4, 1, 0), 1.f, Metal(Vec3(0.7f, 0.6f, 0.5f), 0.0f));
+	spheres[1] = Sphere(Vec3(0.f, 1.f, 0.f), 1.f, Dielectric(1.5f), RandomDirection() * SPHERE_MOVE_SPEED);
+	spheres[2] = Sphere(Vec3(-4, 1, 0), 1.f, Lambertian(Vec3(0.4f, 0.2f, 0.1f)), RandomDirection() * SPHERE_MOVE_SPEED);
+	spheres[3] = Sphere(Vec3(4, 1, 0), 1.f, Metal(Vec3(0.7f, 0.6f, 0.5f), 0.0f), RandomDirection() * SPHERE_MOVE_SPEED);
 
 	// Create small spheres
 	int i = 4;
@@ -501,10 +502,27 @@ std::vector<Sphere> RandomScene(const int sphere_count) {
 		const float dist = angle * 0.2f + 1;
 		const Vec3 center(cos(angle) * dist, 0.2f, sin(angle) * dist);
 		
-		spheres[i] = Sphere(center, 0.2f, GenerateRandomMaterial());
+		spheres[i] = Sphere(center, 0.2f, GenerateRandomMaterial(), RandomDirection() * SPHERE_MOVE_SPEED);
 	}
 
 	return spheres;
+}
+
+// Move spheres inside bounding box
+void MoveSpheres(std::vector<Sphere>& spheres, std::vector<SphereData>& sphere_datas, const float delta_time)
+{
+	const Vec3 bb_pos(0, 1.5f, 0);
+	const Vec3 bb_half_size(3.f, 1.5f, 3.f);
+
+	// Skip first sphere since it's the ground sphere
+	for (int i = 1; i < SPHERE_COUNT; i++)
+	{
+		Sphere& sphere = spheres[i];
+		sphere.MoveWithinBoundingBox(bb_pos, bb_half_size, delta_time);
+
+		SphereData& sphere_data = sphere_datas[i];
+		sphere_data.center = sphere.center;
+	}
 }
 
 ///////////////////////////////////////////////////////////////
@@ -669,6 +687,10 @@ int main()
 		const auto frame_delta = std::chrono::duration_cast<std::chrono::nanoseconds>(frame_end - frame_start).count();
 		frame_start = std::chrono::steady_clock::now();
 		const float delta_time = static_cast<float>(frame_delta / 1000000000.0);
+
+		MoveSpheres(spheres, sphere_datas, delta_time);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, sphere_ssbo);
+		glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(SphereData) * SPHERE_COUNT, sphere_datas.data());
 		
 		glfwPollEvents();
 		UpdateCamera(window, cam, delta_time);
