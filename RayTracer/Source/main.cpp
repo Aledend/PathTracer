@@ -17,19 +17,22 @@
 /*
 	Variables to control program
 */
-const int WINDOW_WIDTH = 1200;
-const int WINDOW_HEIGHT = 800;
+const int WINDOW_WIDTH = 1920;
+const int WINDOW_HEIGHT = 1080;
 const int PIXEL_COUNT = WINDOW_HEIGHT * WINDOW_WIDTH;
 const int WORK_GROUP_SIZE = 300;
 const int AA_ITERATIONS = 20;
-const int SPHERE_COUNT = 20; // One sphere is reserverd for the ground
-const Vec3 CAMERA_LOOK_AT = Vec3(0,1.f,0);
-const Vec3 INITIAL_CAMERA_POSITION = Vec3(18, 4, 18);
+const int SPHERE_COUNT = 20; // One sphere is reserved for the ground
+const Vec3 CAMERA_LOOK_AT = Vec3(0,2.f,0);
+const Vec3 INITIAL_CAMERA_POSITION = Vec3(18, 6, 18);
 const float SPHERE_MOVE_SPEED = 0.55f;
 
-const float CAMERA_ANGULAR_SPEED_HORIZONTAL = static_cast<float>(M_PI / 2);
-const float CAMERA_ANGULAR_SPEED_VERTICAL = static_cast<float>(M_PI / 4);
-const float CAMERA_FORWARD_MULTIPLIER = 0.2f; // Value between 0 and 1;
+const Vec3 SCENE_BB_POS(0, 3.f, 0);
+const Vec3 SCENE_BB_HALF_SIZE(5, 3.f, 5);
+
+const float CAMERA_ANGULAR_SPEED_HORIZONTAL = static_cast<float>(M_PI / 3);
+const float CAMERA_ANGULAR_SPEED_VERTICAL = static_cast<float>(M_PI / 8);
+const float CAMERA_FORWARD_MULTIPLIER = 0.1f; // Value between 0 and 1;
 
 
 /*
@@ -511,14 +514,11 @@ std::vector<Sphere> RandomScene(const int sphere_count) {
 // Move spheres inside bounding box
 void MoveSpheres(std::vector<Sphere>& spheres, std::vector<SphereData>& sphere_datas, const float delta_time)
 {
-	const Vec3 bb_pos(0, 1.5f, 0);
-	const Vec3 bb_half_size(3.f, 1.5f, 3.f);
-
 	// Skip first sphere since it's the ground sphere
 	for (int i = 1; i < SPHERE_COUNT; i++)
 	{
 		Sphere& sphere = spheres[i];
-		sphere.MoveWithinBoundingBox(bb_pos, bb_half_size, delta_time);
+		sphere.MoveWithinBoundingBox(SCENE_BB_POS, SCENE_BB_HALF_SIZE, delta_time);
 
 		SphereData& sphere_data = sphere_datas[i];
 		sphere_data.center = sphere.center;
